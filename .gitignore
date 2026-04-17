@@ -1,0 +1,6 @@
+/.zed
+compile_commands.json
+/.qtcreator
+/build
+build*/
+.DS_Store
