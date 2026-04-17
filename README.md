@@ -23,13 +23,13 @@ The input data is presented as a single text file with the .dot extension. It co
 Sample input file:
 
 
-*digraph G {
+digraph G {
    first[shape = diamond];
    second[shape = rectangle];  
    third[shape = rectangle];  
    first -> second;
    first -> third;
-}*
+}
 
 
 The output file with the program report must be a text file with the .txt extension. This file contains a text report: "Target node IS COVERED" or "Target node is NOT COVERED". As well as a list of nodes that need to be added if the coverage is incomplete.
