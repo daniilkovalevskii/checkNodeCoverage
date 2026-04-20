@@ -2,13 +2,14 @@
 #include <QDebug>
 #include <QFile>
 #include <QCoreApplication>
+#include <QRegularExpression>
+
 
 enum State {
     ABOVE_TARGET,
     SEARCHING,
     COVERED
 };
-
 
 struct Result {
     QVector<Node*> erroneous;
@@ -23,7 +24,6 @@ struct Result {
 struct Info {
     int uncovered;   // Число непокрытых листьев снизу
 };
-
 
 Info dfs(Node* node,
          const QSet<Node*>& marked,
@@ -133,70 +133,95 @@ Info dfs(Node* node,
     return {totalUncovered};
 }
 
+bool parse(const QStringList& text)
+{
+    /*  Порядок проверок
+     *  0. пустая строка
+     *  1. forbidden
+     *  2. graphDeclaration
+     *  3. graphEnd
+     *  4. attributes
+     *  5. edge
+     *  6. defaultNodeDeclaration
+     */
+    QRegularExpression graphDeclaration(R"(^\s*digraph\s+\w+\s*\{)");
+    QRegularExpression graphEnd(R"(^\s*})");
+    QRegularExpression defaulNodeDeclaration(R"(^\s*(\w+)\s*;)");
+    QRegularExpression edge(R"(^\s*(\w+(?:\s*->\s*\w+)+)\s*;)");
+    QRegularExpression attributes(R"(^\s*\b(?<nodeName>\w+)\b\s*\[\s*shape\s*\=\s*\b(?<nodeShape>\w+)\b\s*\]\s*;)");
+    QRegularExpression forbidden(R"(^\s*(subgraph|cluster|graph|node|edge)\b)");
 
+    for (int i = 0; i < text.size(); i++)
+    {
+        QString line = text[i];
+        int lineNumber = i + 1;
+        QRegularExpressionMatch match;
+
+        if (line.trimmed().isEmpty())
+        {
+            qDebug() << QString("line %1 is empty").arg(lineNumber);
+        }
+        else if ((match = forbidden.match(line)).hasMatch())
+        {
+            qDebug() << "Обнаружена запрещённая структура или сложный тип узла в строке " << lineNumber << ":" << line;
+            qDebug() << "Используйте только плоский digraph и простые формы.";
+        }
+        else if ((match = graphDeclaration.match(line)).hasMatch())
+        {
+            qDebug() << "Graph Started";
+        }
+        else if ((match = graphEnd.match(line)).hasMatch())
+        {
+            qDebug() << "Graph ended";
+        }
+        else if ((match = attributes.match(line)).hasMatch())
+        {
+            qDebug() << QString("Node: %1; shape = %2").arg(match.captured("nodeName"), match.captured("nodeShape"));
+        }
+        else if ((match = edge.match(line)).hasMatch())
+        {
+            qDebug() << "Edge:" << match.captured(1);
+        }
+        else if ((match = defaulNodeDeclaration.match(line)).hasMatch())
+        {
+            qDebug() << "Default node:" << match.captured(1);
+        }
+        else {
+            qDebug() << "Синтаксическая ошибка в описании графа DOT в строке " << lineNumber << ":" << line;
+        }
+
+    }
+
+    return true;
+}
 
 int main(int argc, char *argv[])
 {
     //QCoreApplication a(argc, argv);
 
-    // Структура: R -> [ A(DIAMOND), B(DIAMOND), C(DIAMOND) ]
-    Node* R = new Node("Root", DEFAULT);
-    Node* A = new Node("Alpha", DIAMOND);
-    Node* B = new Node("Beta", DIAMOND);
-    Node* C = new Node("Gamma", DIAMOND);
+    // TEST DATA
+    QStringList ex =
+    {
+        {"graph G {"},
+        {""},
+        {"  first[shape = diamond];"},
+        {"  fourth[shape = rectangle];"},
+        {"  fifth[shape = rectangle];"},
+        {"  sixth[shape = rectangle];"},
+        {""},
+        {""},
+        {"  first -> second;"},
+        {"  first -> third;"},
+        {"  third - fourth;"},
+        {"  second -> fifth;"},
+        {"  second -> sixth;"},
+        {""},
+        {"  twenty;"},
+        {"}"}
+    };
 
-    R->children = {A, B, C};
-    A->parent = R; B->parent = R; C->parent = R;
 
-    QSet<Node*> marked;
-
-
-
-    Result result;
-
-    dfs(R, marked, ABOVE_TARGET, nullptr, result);
-
-
-
-    qDebug() << "All marked nodes:";
-    for (Node* node : marked) {
-        if (node) { // Проверка на nullptr
-            qDebug() << node ->getName();
-        }
-    }
-
-    qDebug() << "ERRORS:";
-    qDebug() << result.fileError;
-
-    qDebug() << "__________________________________________";
-
-    qDebug() << "ERRONEOUS:";
-    if (result.erroneous.isEmpty())
-        qDebug() << "NO ERRONEOUS NODES";
-    for (Node* node : result.erroneous) {
-        if (node) { // Проверка на nullptr
-            qDebug() << node ->getName();
-        }
-    }
-
-    qDebug() << "REDUNDANT:";
-    if (result.redundant.isEmpty())
-        qDebug() << "NO REDUNDANT NODES";
-    for (Node* node : result.redundant) {
-        if (node) { // Проверка на nullptr
-            qDebug() << node ->getName();
-        }
-    }
-
-    qDebug() << "MISSING:";
-    if (result.missing.isEmpty())
-        qDebug() << "NO MISSING NODES";
-    for (Node* node : result.missing) {
-        if (node) { // Проверка на nullptr
-            qDebug() << node ->getName();
-        }
-    }
-
+    parse(ex);
 
     //return a.exec();
     return 0;
